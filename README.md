@@ -1,2 +1,3 @@
-# Partage__smartcontracts-
-We'll write our smart contracts in Clarity, use Clarinet as our development environment, and connect our frontend to the Stacks chain using stacks.js.  For the frontend, we'll be using Next and Tailwind.
+# Partage__Smartcontracts
+Smart contracts are the backend of the Partage's Platform. They are written in Clarity using Clarinet as a development environment. 
+It connects to the frontend using stacks.js.  The frontend itself is written using Next and Tailwind.

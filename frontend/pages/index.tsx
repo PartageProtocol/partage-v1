@@ -1,176 +1,113 @@
-import { useState, useEffect, useCallback } from "react";
-import Head from "next/head";
-import { AppConfig, UserSession, showConnect, openContractCall, } from "@stacks/connect";
-import { uintCV, stringUtf8CV, standardPrincipalCV, hexToCV, cvToHex, makeStandardSTXPostCondition, FungibleConditionCode, callReadOnlyFunction } from "@stacks/transactions";
-import { StacksMocknet } from "@stacks/network";
-import useInterval from "@use-it/interval";
+import { useState, useEffect } from 'react'
+import type { NextPage } from 'next'
+import Head from 'next/head'
+import { StacksMocknet } from '@stacks/network'
+import {
+  AppConfig,
+  UserSession,
+  showConnect,
+  openContractCall,
+} from '@stacks/connect'
+import {
+  NonFungibleConditionCode,
+  FungibleConditionCode,
+  createAssetInfo,
+  makeStandardNonFungiblePostCondition,
+  makeStandardSTXPostCondition,
+  bufferCVFromString,
+  standardPrincipalCV,
+} from '@stacks/transactions'
 
-export default function Home() {
-  const appConfig = new AppConfig(["publish_data"]);
-  const userSession = new UserSession({ appConfig });
+const Home: NextPage = () => {
+  const appConfig = new AppConfig(['publish_data'])
+  const userSession = new UserSession({ appConfig })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [userData, setUserData] = useState({})
+  const [loggedIn, setLoggedIn] = useState(false)
 
-  const [message, setMessage] = useState("");
-  const [price, setPrice] = useState(5);
-  const [userData, setUserData] = useState({});
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [supContractAddress, setSupContractAddress] = useState(
-    "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM");
-  const [supContractName, setSupContractName] = useState("sup");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [postedMessage, setPostedMessage] = useState("none");
-  // Set up the network
-  const network = new StacksMocknet();
-
-  const handleMessageChange = (e) => {
-    setMessage(e.target.value);
-  };
-
-  const handlePriceChange = (e) => {
-    setPrice(e.target.value);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const functionArgs = [stringUtf8CV(message), uintCV(price * 1000000)];
-    const postConditionAddress = userSession.loadUserData().profile.stxAddress.testnet;
-    const postConditionCode = FungibleConditionCode.LessEqual;
-    const postConditionAmount = price * 1000000;
-    const postConditions = [
-      makeStandardSTXPostCondition(
-        postConditionAddress,
-        postConditionCode,
-        postConditionAmount
-      ),
-    ];
-
-    const getMessage = useCallback(async () => {
-      if (
-          userSession &&
-          userSession.isUserSignedIn() &&
-          userSession.loadUserData()
-      ) {
-          const userAddress =
-              userSession.loadUserData().profile.stxAddress.testnet;
-          const clarityAddress = standardPrincipalCV(userAddress);
-          const options = {
-              contractAddress: supContractAddress,
-              contractName: supContractName,
-              functionName: "get-message",
-              network,
-              functionArgs: [clarityAddress],
-              senderAddress: userAddress,
-          };
-
-          const result = await callReadOnlyFunction(options);
-          if (result.value) {
-              setPostedMessage(result.value.data);
-          }
-      }
-    }, []);
-  
-    // Run the getMessage function at load to get the message from the contract
-    useEffect(getMessage, [userSession]);
-  
-    // Poll the Stacks API every 30 seconds looking for changes
-    useInterval(getMessage, 30000);
-
-    const options = {
-        contractAddress: supContractAddress,
-        contractName: "sup",
-        functionName: "write-sup",
-        functionArgs,
-        network,
-        postConditions,
-        appDetails: {
-            name: "Sup",
-            icon: window.location.origin + "/vercel.svg",
-        },
-        onFinish: (data) => {
-            console.log("Stacks Transaction:", data.stacksTransaction);
-            console.log("Transaction ID:", data.txId);
-            console.log("Raw transaction:", data.txRaw);
-        },
-    };
-
-    await openContractCall(options);
-  };
+  // Set up the network and API
+  const network = new StacksMocknet()
 
   function authenticate() {
     showConnect({
       appDetails: {
-        name: "Sup",
-        icon: "https://assets.website-files.com/618b0aafa4afde65f2fe38fe/618b0aafa4afde2ae1fe3a1f_icon-isotipo.svg",
+        name: 'Fabulous Frogs',
+        icon: 'https://assets.website-files.com/618b0aafa4afde65f2fe38fe/618b0aafa4afde2ae1fe3a1f_icon-isotipo.svg',
       },
-      redirectTo: "/",
+      redirectTo: '/',
       onFinish: () => {
-        window.location.reload();
+        window.location.reload()
       },
       userSession,
-    });
+    })
   }
 
   useEffect(() => {
     if (userSession.isSignInPending()) {
       userSession.handlePendingSignIn().then((userData) => {
-        setUserData(userData);
-      });
+        setUserData(userData)
+      })
     } else if (userSession.isUserSignedIn()) {
-      setLoggedIn(true);
-      setUserData(userSession.loadUserData());
+      setLoggedIn(true)
+      setUserData(userSession.loadUserData())
     }
-  }, []);
+  }, [])
+
+  const mint = async () => {
+    const assetAddress = 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM'
+    // Add post conditions here
+
+    const functionArgs = [
+      standardPrincipalCV(
+        userSession.loadUserData().profile.stxAddress.testnet
+      ),
+    ]
+
+    const options = {
+      contractAddress: assetAddress,
+      contractName: 'fabulous-frogs',
+      functionName: 'mint',
+      functionArgs,
+      network,
+      // Don't forget to pass the created post conditions here
+      appDetails: {
+        name: 'Fabulous Frogs',
+        icon: 'https://assets.website-files.com/618b0aafa4afde65f2fe38fe/618b0aafa4afde2ae1fe3a1f_icon-isotipo.svg',
+      },
+      onFinish: (data: any) => {
+        console.log(data)
+      },
+    }
+
+    await openContractCall(options)
+  }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen py-2">
+    <div className="flex min-h-screen flex-col items-center justify-center py-2">
       <Head>
-        <title>Sup</title>
+        <title>Partage</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className="flex flex-col items-center justify-center w-full flex-1 px-20 text-center">
-        <div className="flex flex-col w-full items-center justify-center">
-          <h1 className="text-6xl font-bold mb-24">Sup</h1>
+      <main className="flex w-full flex-1 flex-col items-center justify-center px-20 text-center">
+        <h1 className="text-6xl font-bold">Shared NFT utilities</h1>
+
+        <p className="mt-4 w-full text-xl md:w-1/2">
+          Partage-v1 contains public functions to mint, burn, transfer, fractionalize NFTs, list and unlist fractions for sale, buy, transfer and burn fractions.
+        </p>
+
+        <div className="mt-6 flex max-w-4xl flex-wrap items-center justify-around sm:w-full">
           {loggedIn ? (
-            <>
-            <form onSubmit={handleSubmit}>
-              <p>
-                Say
-                <input
-                  className="p-6 border rounded mx-2"
-                  type="text"
-                  value={message}
-                  onChange={handleMessageChange}
-                  placeholder="something"
-                />
-                for
-                <input
-                  className="p-6 border rounded mx-2"
-                  type="number"
-                  value={price}
-                  onChange={handlePriceChange}
-                />{" "}
-                STX
-              </p>
-              <button
-                type="submit"
-                className="p-6 bg-green-500 text-white mt-8 rounded"
-              >
-                Post Message
-              </button>
-            </form>
-            <div className="mt-12">
-            {postedMessage !== "none" ? (
-                <p>You said "{postedMessage}"</p>
-            ) : (
-                <p>You haven't posted anything yet.</p>
-            )}
-            </div>
-          </>
+            <button
+              onClick={() => mint()}
+              className="rounded bg-indigo-500 p-4 text-2xl text-white hover:bg-indigo-700"
+            >
+              Mint
+            </button>
           ) : (
             <button
-              className="bg-white-500 hover:bg-gray-300 border-black border-2 font-bold py-2 px-4 rounded mb-6"
+              className="bg-white-500 mb-6 rounded border-2 border-black py-2 px-4 font-bold hover:bg-gray-300"
               onClick={() => authenticate()}
             >
               Connect to Wallet
@@ -179,5 +116,7 @@ export default function Home() {
         </div>
       </main>
     </div>
-  );
+  )
 }
+
+export default Home

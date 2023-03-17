@@ -38,7 +38,7 @@
 
 ;; data structure
 (define-fungible-token fractions)
-(define-non-fungible-token nft uint)
+(define-non-fungible-token pNFT uint)
 ;; data storage
 (define-map balances {id: uint, owner: principal} uint)
 (define-map supplies uint uint)
@@ -59,7 +59,7 @@
 
 ;; wrap the built-in nft-get-owner? function
 (define-read-only (get-owner (id uint)) 
-    (ok (nft-get-owner? nft id)))
+    (ok (nft-get-owner? pNFT id)))
 ;; track the last token ID
 (define-read-only (get-last-nft-id) 
     (ok (var-get last-nft-id)))
@@ -95,7 +95,7 @@
           (id (+ (var-get last-nft-id) u1))
         )
         (asserts! (is-eq tx-sender recipient) err-recipient-only)
-        (try! (nft-mint? nft id recipient))
+        (try! (nft-mint? pNFT id recipient))
         (map-set uris id uri)
         (print 
           {
@@ -112,7 +112,7 @@
     (begin
         (asserts! (is-eq tx-sender recipient) err-owner-only)
         (asserts! (is-eq (unwrap-panic (get-total-supply id)) u0) err-invalid-supply-value)
-        (try! (nft-burn? nft id recipient))
+        (try! (nft-burn? pNFT id recipient))
         (print
           {
             type: "burn-nft",
@@ -126,13 +126,13 @@
 (define-public (transfer-nft (id uint) (sender principal) (recipient principal)) 
     (begin
         (asserts! (is-eq tx-sender sender) err-owner-only)
-        (nft-transfer? nft id sender recipient)))
+        (nft-transfer? pNFT id sender recipient)))
 
 ;; fractionalize an nft into fractions and locks nft in an escrow account (nft owner and recipient only)
 (define-public (fractionalize-nft (id uint) (recipient principal) (supply uint))
   (let 
     (
-      (owner (unwrap! (nft-get-owner? nft id) err-invalid-nft-id))
+      (owner (unwrap! (nft-get-owner? pNFT id) err-invalid-nft-id))
     )
     (asserts! (is-eq tx-sender recipient) err-recipient-only)
     (asserts! (is-eq tx-sender owner) err-owner-only)
@@ -140,7 +140,7 @@
     ;; create fractions
     (try! (ft-mint? fractions supply recipient))
     ;; lock the nft in an escrow account on the contract
-    (try! (nft-transfer? nft id recipient (as-contract tx-sender)))
+    (try! (nft-transfer? pNFT id recipient (as-contract tx-sender)))
     (map-set supplies id supply)
     (map-set balances { id: id, owner: recipient } supply)
     (print 
@@ -241,7 +241,7 @@
     )
     (asserts! (is-eq tx-sender recipient) err-recipient-only)
     (asserts! (is-eq balance supply) err-insufficient-balance)
-    (as-contract (try! (nft-transfer? nft id tx-sender recipient)))
+    (as-contract (try! (nft-transfer? pNFT id tx-sender recipient)))
     (try! (ft-burn? fractions balance recipient))
     (map-delete balances { id: id, owner: recipient })
     (map-delete supplies id)

@@ -4,7 +4,7 @@
 
 ;; At fractionalization the original NFT is locked in the contract. 
 ;; The fractions of NFT are SFTs (= FT linked to an NFT ID). 
-;; The original NFT can't be redeemed from escrow account of the contract, 
+;; The original NFT can't be redeemed from the escrow account, 
 ;; unless by someone owning 100% of the fractions and burning them. 
 
 ;; Author Julien Carbonnell for Partage <|> 
@@ -17,8 +17,6 @@
 
 ;; constants
 (define-constant contract-owner tx-sender)
-(define-constant utility_provider 'ST3PF13W7Z0RRM42A8VZRVFQ75SV1K26RXEP8YGKJ) ;;SPB52MT44QE7WZMNCE9200AY7WBVDJH3726JD3H5
-(define-constant platform_fees 'STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6) ;;SP3Y7N3BH2XTCC7NEM6ZRFF356PTXRWJB6GNYQQ21 on testnet
 ;; nft errors
 (define-constant err-recipient-only (err u100))
 (define-constant err-owner-only (err u101))
@@ -51,7 +49,11 @@
       unit-price: uint,
 		  expiry: uint,
       taker: (optional principal)})
-
+;; data vars
+;; principal variable to pay the utility provider
+(define-data-var utility-provider principal 'SPB52MT44QE7WZMNCE9200AY7WBVDJH3726JD3H5)
+;; principal variable to pay the platform fees
+(define-data-var platform-fees principal 'SP3Y7N3BH2XTCC7NEM6ZRFF356PTXRWJB6GNYQQ21)
 ;; counter variable to increment new id each time an nft is minted 
 (define-data-var last-nft-id uint u0)
 ;; counter variable to increment new id each time fractions are listed for sale
@@ -63,13 +65,16 @@
 ;; track the last token ID
 (define-read-only (get-last-nft-id) 
     (ok (var-get last-nft-id)))
-;; where can I access the metadata of a specific nft?
+;; where can I access the metadata of a given nft?
 (define-read-only (get-token-uri (id uint)) 
   (ok (default-to none (some (map-get? uris id)))))
+;; what's the utility-provider address for a given nft? 
+(define-read-only (get-utility-provider (id uint))
+  (ok (var-get utility-provider)))
 ;; get decimals
 (define-read-only (get-decimals (id uint)) 
   (ok u0))
-;; how many fractions of a specific nft are owned by this wallet?
+;; how many fractions of a given nft are owned by this wallet?
 (define-read-only (get-balance (id uint) (who principal))
   (ok (default-to u0 (map-get? balances {id: id, owner: who}))))
 ;; how many fractions does this wallet own overall?
@@ -78,12 +83,15 @@
 ;; how many fractions are supplied on the market overall?
 (define-read-only (get-overall-supply) 
   (ok (ft-get-supply fractions)))
-;; how many fractions of a nft specific are supplied on the market?
+;; how many fractions of a given nft are supplied on the market?
 (define-read-only (get-total-supply (id uint)) 
   (ok (default-to u0 (map-get? supplies id))))
 ;; returns a listing content
 (define-read-only (get-listing (listing-id uint))
 	(map-get? listings listing-id))
+;; track the last listing ID
+(define-read-only (get-listing-nonce) 
+    (ok (var-get listing-nonce)))
 
 
 ;; public functions
@@ -106,6 +114,22 @@
         )
         (var-set last-nft-id id)
         (ok id)))
+
+;; change default utility-provider address (contract owner only)
+(define-public (set-utility-provider (address principal))
+  (begin
+      (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+      (var-set utility-provider address)
+      (ok true)
+    ))
+
+;; change default platform-fees address (contract owner only)
+(define-public (set-platform-fees (address principal))
+  (begin
+      (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+      (var-set platform-fees address)
+      (ok true)
+    ))
 
 ;; burn an nft (nft owner only) (assume nft isn't fractionalized)
 (define-public (burn-nft (id uint) (recipient principal)) 
@@ -151,7 +175,7 @@
     (ok true)))
 
 ;; marketplace-related functions
-;; list fractions for sale (only nft owner, limited to fraction balance in wallet)
+;; list fractions for sale (nft owner only, limited to fraction balance in wallet)
 (define-public (list-fractions (listing {token-id: uint, amount: uint, unit-price: uint, expiry: uint, taker: (optional principal)}))
     (let 
     (
@@ -164,7 +188,21 @@
 		(var-set listing-nonce (+ listing-id u1))
 		(ok listing-id)))
 
-;; cancelling a listing
+;; list full nft for sale (nft owner only, assume nft isn't fractionalized)
+(define-public (list-nft (listing {token-id: uint, unit-price: uint, expiry: uint, taker: (optional principal)}))
+    (let 
+    (
+      (listing-id (var-get listing-nonce))
+    )
+    (asserts! (is-eq (unwrap-panic (get-total-supply (get token-id listing))) u0) err-invalid-supply-value)
+		(asserts! (> (get expiry listing) block-height) err-asset-expired)
+		(asserts! (> (get unit-price listing) u0) err-price-zero)
+    (try! (transfer-nft (get token-id listing) tx-sender (as-contract tx-sender)))
+    (map-set listings listing-id (merge {amount: u0, maker: tx-sender} listing))
+		(var-set listing-nonce (+ listing-id u1))
+		(ok listing-id)))
+
+;; cancelling a listing (owner only)
 (define-public (unlist-fractions (listing-id uint) (amount uint))
 	(let (
 		    (listing (unwrap! (map-get? listings listing-id) err-unknown-listing))
@@ -186,11 +224,13 @@
 		    (asserts! (not (is-eq (get maker listing) taker)) err-maker-taker-equal)
 		    (asserts! (match (get taker listing) intended-taker (is-eq intended-taker tx-sender) true) err-unintended-taker)
 		    (asserts! (< block-height (get expiry listing)) err-listing-expired)
-        ;; split the price over distinct beneficiaries: utility provider, contract owner, platform fees.
-		    (try! (stx-transfer? (/ (* price u85) u100) taker utility_provider))
-		    (try! (stx-transfer? (/ (* price u10) u100) taker (as-contract tx-sender)))
-        (try! (stx-transfer? (/ (* price u5) u100) taker platform_fees))
-		    (as-contract (try! (transfer listing-id amount tx-sender taker)))
+        ;; check enough money in the buyers wallet
+
+        ;; split the price over distinct beneficiaries: utility provider, nft owner, platform fees.
+		    (try! (stx-transfer? (/ (* price u85) u100) taker (var-get utility-provider)))
+		    (try! (stx-transfer? (/ (* price u10) u100) taker (get maker listing)))
+        (try! (stx-transfer? (/ (* price u5) u100) taker (var-get platform-fees)))
+		    (as-contract (try! (transfer (get token-id listing) amount tx-sender taker)))
 		    ;; update the amount of fractions available in the listing
 		    (map-set listings listing-id 
 							{
@@ -204,6 +244,34 @@
 		;; if amount = 0 then (map-delete listings listing-id)
         (ok listing-id)))
 
+;; buy full nft on sale
+(define-public (buy-nft (listing-id uint))
+    (let 
+        (
+		      (listing (unwrap! (map-get? listings listing-id) err-unknown-listing))
+          (taker tx-sender)
+          (price (get unit-price listing))
+        )
+        ;; check if all buying conditions are met
+		    (asserts! (not (is-eq (get maker listing) taker)) err-maker-taker-equal)
+		    (asserts! (match (get taker listing) intended-taker (is-eq intended-taker tx-sender) true) err-unintended-taker)
+		    (asserts! (< block-height (get expiry listing)) err-listing-expired)
+        ;; split the price over distinct beneficiaries: nft owner, platform fees.
+		    (try! (stx-transfer? (/ (* price u95) u100) taker (get maker listing)))
+        (try! (stx-transfer? (/ (* price u5) u100) taker (var-get platform-fees)))
+		    (as-contract (try! (transfer-nft (get token-id listing) tx-sender taker)))
+		    ;; update the amount of fractions available in the listing
+		    (map-set listings listing-id 
+							{
+								token-id: (get token-id listing), 
+								amount: (get amount listing), 
+								unit-price: (get unit-price listing), 
+								expiry: (get expiry listing), 
+								taker: (get taker listing), 
+								maker: (get maker listing)
+							})
+		;; if amount = 0 then (map-delete listings listing-id)
+        (ok listing-id)))
 
 ;; transfer fractions of a specific nft from one wallet to another
 (define-public (transfer (id uint) (amount uint) (sender principal) (recipient principal))
@@ -254,4 +322,3 @@
       }
     )
     (ok true)))
-

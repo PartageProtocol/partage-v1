@@ -7,6 +7,9 @@
 ;; The original NFT can't be redeemed from the escrow account, 
 ;; unless by someone owning 100% of the fractions and burning them. 
 
+;; The buy function spreads payment between three beneficiaries: 
+;; the utility provider, the listing maker, and the platform fees.
+
 ;; Author Julien Carbonnell for Partage <|> 
 ;; Twitter: @jcarbonnell @partage_btc 
 

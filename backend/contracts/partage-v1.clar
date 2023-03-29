@@ -71,9 +71,12 @@
 ;; where can I access the metadata of a given nft?
 (define-read-only (get-token-uri (id uint)) 
   (ok (default-to none (some (map-get? uris id)))))
-;; what's the utility-provider address for a given nft? 
-(define-read-only (get-utility-provider (id uint))
+;; what's the current utility-provider address? 
+(define-read-only (get-utility-provider)
   (ok (var-get utility-provider)))
+;; what's the current platform-fees address? 
+(define-read-only (get-platform-fees)
+  (ok (var-get platform-fees)))
 ;; get decimals
 (define-read-only (get-decimals (id uint)) 
   (ok u0))

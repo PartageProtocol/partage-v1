@@ -68,7 +68,7 @@
 ;; track the last token ID
 (define-read-only (get-last-nft-id) 
     (ok (var-get last-nft-id)))
-;; where can I access the metadata of a given nft?
+;; get the link to the metadata of a given nft
 (define-read-only (get-token-uri (id uint)) 
   (ok (default-to none (some (map-get? uris id)))))
 ;; what's the current utility-provider address? 
@@ -110,6 +110,7 @@
         )
         (asserts! (is-eq tx-sender recipient) err-recipient-only)
         (try! (nft-mint? pNFT id recipient))
+        ;; a uri is attached to each nft id
         (map-set uris id uri)
         (print 
           {

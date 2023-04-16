@@ -1,10 +1,16 @@
 # partage-v1
-Partage-v1 is a smart contract written in Clarity at the backend, and a frontend to interact with the smart contract, written using Next and Tailwind.
 
-Partage-v1 smart contract contains functions to mint, burn, transfer, fractionalize NFTs, list/unlist fractions for sale, buy, transfer and burn fractions. At the fractionalization the original NFT is locked in the contract. The fractions of NFT are Semi-Fungible Tokens (SFT = FT linked to an NFT ID). The original NFT can't be redeemed from escrow account of the contract, unless by someone owning 100% of the fractions and burning them. 
+Partage is an NFT marketplace for shared utilities.
+We built our v1 on a first use case based in Austin, Texas. 
+Tare is a premium sushi restaurant willing to become the first NFT restaurant in the state. 
 
-- smart contract is deployed on testnet https://explorer.stacks.co/txid/ST2NC54N30J95AHB55W6VY3MF9X4G07F4XCPVYKGD.partage-v1?chain=testnet
+We used AI to generate a collection of NFTs inspired by the famous Japanese painter Hokusai. 
+Each NFT represents one month in the year and can be unlimitedly fractionalized to adapt to the supply demand by the restaurant owners. NFT owners will experience a personalized VIP dinner with the Chef cooking special products directly imported from Japan based on the customer's tastes.
 
-- frontend: stacks.js documentation https://github.com/hirosystems/stacks.js 
+- smart contract is deployed on mainnet https://explorer.hiro.so/txid/0x34222f40dd5def2f42f033288f800310dd10b7a74b6ebc5fe91477533171f710?chain=mainnet
 
-- npm libraries https://www.npmjs.com/package/@stacks/transactions#smart-contract-function-call
+The partage-v1 smart contract feature functions to mint, burn, transfer, and fractionalize NFTs, list/unlist fractions for sale, buy, transfer and burn fractions. At the fractionalization the original NFT is locked in the contract. The original NFT can't be redeemed from escrow account of the contract, unless by someone owning 100% of the fractions and burning them. The fractions of NFT are Semi-Fungible Tokens (SFT = FT linked to an NFT ID). All purchases automatically spread payments between three beneficiaries: the utility provider (85%), the NFT owner (10%), and the platform (5%).
+
+- the marketplace is deployed on netlify https://partage.netlify.app/ 
+
+- send a message on telegram to purchase NFTs https://t.me/partagebtc
